@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Dex configuration for https://oauth.vocdoni.org.
+#
+# This file is a gomplate template rendered by the upstream Dex entrypoint at
+# container start. Its only template expressions read the ISSUER variable
+# (issuer and Google redirect URI) and PORT (listen port), plus presence
+# checks in comments that stop the container when a required secret variable
+# is missing. Secret values are never templated: Dex reads them itself ($VAR
+# in the connector config, secretEnv for clients).
+#
+# Add a tool with `make add-client ID=<id> URL=<callback>`; keep
+# staticClients the last section of this file.
+
+issuer: {{ .Env.ISSUER }}
+
+storage:
+  type: sqlite3
+  config:
+    file: /data/dex.db
+
+web:
+  http: 0.0.0.0:{{ .Env.PORT }}
+
+logger:
+  level: info
+  format: json
+  excludeFields: [email, username, preferred_username]
+
+frontend:
+  issuer: Vocdoni
+  logoURL: theme/vocdoni-logo.png
+  theme: light
+  dir: /srv/dex/web
+
+expiry:
+  idTokens: 10m
+  authRequests: 10m
+  deviceRequests: 5m
+
+# Signing keys rotate every 6 h (expiry.signingKeys is deprecated in v2.46.0).
+signer:
+  type: local
+  config:
+    keysRotationPeriod: 6h
+
+oauth2:
+  grantTypes: [authorization_code]
+  responseTypes: [code]
+  skipApprovalScreen: true
+  alwaysShowLoginScreen: false
+  pkce:
+    enforce: true
+    codeChallengeMethodsSupported: [S256]
+
+enablePasswordDB: false
+
+connectors:
+  # {{ if not (getenv "GOOGLE_CLIENT_ID") }}{{ fail "GOOGLE_CLIENT_ID is not set" }}{{ end }}
+  # {{ if not (getenv "GOOGLE_CLIENT_SECRET") }}{{ fail "GOOGLE_CLIENT_SECRET is not set" }}{{ end }}
+  - type: google
+    id: google
+    name: Google
+    config:
+      clientID: $GOOGLE_CLIENT_ID
+      clientSecret: $GOOGLE_CLIENT_SECRET
+      redirectURI: {{ .Env.ISSUER }}/callback
+      hostedDomains:
+        - vocdoni.org
+
+staticClients:
+  # {{ if not (getenv "CLIENT_FOLIO_SECRET") }}{{ fail "CLIENT_FOLIO_SECRET is not set" }}{{ end }}
+  - id: folio
+    name: Folio
+    secretEnv: CLIENT_FOLIO_SECRET
+    redirectURIs:
+      - https://folio.vocdoni.net/ui/api/oidc/callback
