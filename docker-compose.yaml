@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Local development provider: the production image (dev target: plus
+# dev/config.yaml) with a password database instead of Google.
+#
+#   make dev PASSWORD=<password>      # http://localhost:5556, user dev@vocdoni.org
+#
+# Client "dev", secret $CLIENT_DEV_SECRET (default dev-client-secret),
+# redirect URI http://localhost:8080/auth/callback (the examples' default).
+services:
+  oauth:
+    build:
+      context: .
+      target: dev
+    image: vocdoni-oauth:dev-config
+    environment:
+      PORT: "5556"
+      ISSUER: http://localhost:5556
+      DEV_PASSWORD_HASH: ${DEV_PASSWORD_HASH:?use make dev PASSWORD=...}
+      CLIENT_DEV_SECRET: ${CLIENT_DEV_SECRET:-dev-client-secret}
+      DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS: "true"
+    ports:
+      - "127.0.0.1:5556:5556"
+    volumes:
+      - dex-dev:/data
+
+volumes:
+  dex-dev:

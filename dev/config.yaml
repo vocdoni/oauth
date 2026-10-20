@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Local development provider (docker compose up): the production policy with
+# a password database instead of Google, one user and one client. Never
+# deployed; production clients list production URLs only.
+
+issuer: {{ .Env.ISSUER }}
+
+storage:
+  type: sqlite3
+  config:
+    file: /data/dex.db
+
+web:
+  http: 0.0.0.0:{{ .Env.PORT }}
+
+logger:
+  level: info
+  format: json
+
+frontend:
+  issuer: Vocdoni (development)
+  logoURL: theme/vocdoni-logo.png
+  theme: light
+  dir: /srv/dex/web
+
+expiry:
+  idTokens: 10m
+  authRequests: 10m
+  deviceRequests: 5m
+
+# Signing keys rotate every 6 h (expiry.signingKeys is deprecated in v2.46.0).
+signer:
+  type: local
+  config:
+    keysRotationPeriod: 6h
+
+oauth2:
+  grantTypes: [authorization_code]
+  responseTypes: [code]
+  skipApprovalScreen: true
+  alwaysShowLoginScreen: false
+  pkce:
+    enforce: true
+    codeChallengeMethodsSupported: [S256]
+
+enablePasswordDB: true
+
+staticPasswords:
+  # {{ if not (getenv "DEV_PASSWORD_HASH") }}{{ fail "DEV_PASSWORD_HASH is not set (make dev PASSWORD=...)" }}{{ end }}
+  - email: dev@vocdoni.org
+    username: dev
+    name: Dev User
+    userID: 00000000-0000-4000-8000-000000000001
+    hashFromEnv: DEV_PASSWORD_HASH
+
+staticClients:
+  - id: dev
+    name: Local development
+    secretEnv: CLIENT_DEV_SECRET
+    redirectURIs:
+      - http://localhost:8080/auth/callback

@@ -1,0 +1,20 @@
+# Secrets: never committed (owner files live next to the checkout)
+*-secret*.txt
+*-token.txt
+*-api-key.txt
+.env
+.env.*
+
+# Local delivery notes, specs and plans stay local
+.delivery/
+docs/specs/
+docs/plans/
+
+# Node
+node_modules/
+dist/
+*.tgz
+.vitest/
+
+# Go
+/examples/go/example

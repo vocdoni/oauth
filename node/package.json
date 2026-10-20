@@ -1,0 +1,42 @@
+{
+  "name": "@vocdoni/oauth",
+  "version": "0.1.0",
+  "description": "Sign in to Vocdoni internal tools through oauth.vocdoni.org (OpenID Connect kit for Node and Express)",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vocdoni/oauth.git",
+    "directory": "node"
+  },
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "fixtures": "UPDATE_FIXTURES=1 vitest run test/cookie.test.ts",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "openid-client": "6.8.8"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "24.19.2",
+    "express": "5.3.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,6 @@
+# The image needs only these files; everything else (kits, secrets, .git)
+# stays out of the build context.
+*
+!config.yaml
+!dev/config.yaml
+!theme/logo.png
