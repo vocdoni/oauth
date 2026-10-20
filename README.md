@@ -46,7 +46,7 @@ only, and the Google session is not ours to end.
    the first key encrypts, any key decrypts).
 3. Integrate a kit.
 
-Go (`go get github.com/vocdoni/oauth/go@go/v0.1.0`):
+Go (`go get github.com/vocdoni/oauth/go@v0.1.0`):
 
 ```go
 keys, err := vocauth.ParseCookieKeys(os.Getenv("OAUTH_COOKIE_KEYS"))
