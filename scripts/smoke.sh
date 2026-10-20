@@ -23,12 +23,12 @@
 #
 # Needs docker, curl and jq, and outbound HTTPS (the Google connector fetches
 # Google's discovery document at start). Temporary files go under $SMOKE_TMP
-# (default $RUNNER_TEMP, else ~/.cache/folio/tmp), never /tmp.
+# (default $RUNNER_TEMP, else ~/.cache/vocdoni-oauth/tmp).
 set -euo pipefail
 
 image=${1:?usage: scripts/smoke.sh <image> [config.yaml]}
 src_config=${2:-}
-tmp_root=${SMOKE_TMP:-${RUNNER_TEMP:-$HOME/.cache/folio/tmp}}
+tmp_root=${SMOKE_TMP:-${RUNNER_TEMP:-$HOME/.cache/vocdoni-oauth/tmp}}
 mkdir -p "$tmp_root"
 work=$(mktemp -d "$tmp_root/oauth-smoke.XXXXXX")
 run_id=oauth-smoke-$$
