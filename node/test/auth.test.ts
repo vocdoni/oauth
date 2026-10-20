@@ -234,7 +234,8 @@ describe('provider error', () => {
 });
 
 describe('open redirect', () => {
-  it.each(['//evil.com', '/\\evil.com', 'https://evil.com', '/\t/evil.com', 'evil.com', '', '\\\\evil.com'])(
+  it.each(['//evil.com', '/\\evil.com', 'https://evil.com', '/\t/evil.com', 'evil.com', '', '\\\\evil.com',
+    '/\u2028x', '/a/../b', '/x\\y'])(
     'return_to %j lands on /',
     async (v) => {
       const res = await signIn(makeAuth(), v);

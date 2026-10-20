@@ -357,7 +357,8 @@ func (h *harness) stateValue(c *http.Cookie) string {
 }
 
 func TestOpenRedirectReturnTo(t *testing.T) {
-	for _, v := range []string{"//evil.com", "/\\evil.com", "https://evil.com", "/\t/evil.com", "evil.com", "", "\\\\evil.com", "/%0d%0a"} {
+	for _, v := range []string{"//evil.com", "/\\evil.com", "https://evil.com", "/\t/evil.com", "evil.com", "", "\\\\evil.com", "/%0d%0a",
+		"/\u2028x", "/a/../b", "/x\\y"} {
 		h := newHarness(t, nil)
 		res := h.signIn(v)
 		want := "/"
@@ -377,7 +378,7 @@ func TestLogout(t *testing.T) {
 	if res.StatusCode != http.StatusMethodNotAllowed || res.Header.Get("Allow") != "POST" || cookieNamed(res, SessionCookie) != nil {
 		t.Fatalf("GET logout: %d allow=%q", res.StatusCode, res.Header.Get("Allow"))
 	}
-	// Cross-site or header-less POSTs are refused and keep the session (R5).
+	// Cross-site or header-less POSTs are refused and keep the session.
 	for _, c := range []struct {
 		name string
 		hdr  map[string]string

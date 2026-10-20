@@ -7,16 +7,27 @@ import (
 	"testing"
 )
 
+// The keep and drop tables are the same in node/test/admission.test.ts.
 func TestSanitizeReturnTo(t *testing.T) {
-	keep := []string{"/a", "/docs?x=1&y=%2F", "/ui/", "/%2F%2Fevil.com"}
+	keep := []string{"/", "/a", "/docs?x=1&y=%2F", "/ui/", "/%2F%2Fevil.com", "/ok/path?x=1",
+		"/..%5Cevil", "/%0d%0a", "/a?next=/../b", "/a#/../b", "/.well-known/x", "/a.b/c..d/...",
+		"/" + strings.Repeat("a", maxReturnToLen-1)}
 	for _, s := range keep {
 		if got := sanitizeReturnTo(s); got != s {
 			t.Errorf("sanitizeReturnTo(%q) = %q, want unchanged", s, got)
 		}
 	}
-	drop := []string{"", "/", "//evil.com", "/\\evil.com", "https://evil.com", "evil.com",
+	drop := []string{"", "//evil.com", "/\\evil.com", "https://evil.com", "evil.com",
 		"/\t/evil.com", "/\n/evil.com", "/\r\n/x", "\\/evil.com", "/x\x7f", " /a",
-		"/" + strings.Repeat("a", maxReturnToLen)}
+		"/" + strings.Repeat("a", maxReturnToLen),
+		// backslash anywhere
+		"/../\\evil.example", "/x\\y", "/\\x", "/a?x=\\",
+		// "." and ".." path segments, literal or %2e-encoded
+		"/a/../b", "/./x", "/a/..", "/a/.", "/a/./?x=1", "/a/..#f", "/%2e%2e/x", "/a/.%2E/b", "/%2E",
+		// other slash and control variants
+		"//x", "/x\ty", "/x\r", "/x\n", "/\t/x",
+		// not printable ASCII (a Fetch Location header cannot hold > U+00FF)
+		"/caf\u00e9", "/\u2028x", "/\u65e5\u672c"}
 	for _, s := range drop {
 		if got := sanitizeReturnTo(s); got != "/" {
 			t.Errorf("sanitizeReturnTo(%q) = %q, want /", s, got)
