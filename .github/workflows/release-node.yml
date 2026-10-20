@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Node kit release: a tag node/vX.Y.Z (matching node/package.json) builds and
+# tests the kit, packs it with `npm pack` and attaches the tarball to a GitHub
+# release, installable without a token:
+#   npm i https://github.com/vocdoni/oauth/releases/download/node/vX.Y.Z/vocdoni-oauth-X.Y.Z.tgz
+# The Go kit needs no workflow: a tag go/vX.Y.Z is the release
+# (go get github.com/vocdoni/oauth/go@go/vX.Y.Z).
+name: release-node
+
+on:
+  push:
+    tags: ["node/v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release and upload the asset
+    defaults:
+      run:
+        working-directory: node
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: node/.nvmrc
+          cache: npm
+          cache-dependency-path: node/package-lock.json
+      - name: tag matches package.json
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#node/v}"
+          pkg="$(node -p 'require("./package.json").version')"
+          [ "$version" = "$pkg" ] || { echo "::error::tag $GITHUB_REF_NAME does not match package.json version $pkg"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - name: pack
+        run: npm pack # runs prepack (clean build) and writes vocdoni-oauth-$VERSION.tgz
+      - name: GitHub release with the tarball
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          asset="vocdoni-oauth-${VERSION}.tgz"
+          test -f "$asset"
+          gh release create "$GITHUB_REF_NAME" "$asset" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Node kit v${VERSION}" \
+            --notes "Install: npm i https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${asset}"
