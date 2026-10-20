@@ -110,17 +110,16 @@ Kit behaviour (identical in both kits):
 - If the provider is down, the tool still starts; sign-in answers
   `503 {"error":"sso_unavailable"}` and is retried with backoff.
 
-## Google setup (owner, once)
+## Google setup (once)
 
 1. Google Cloud console, in a project that belongs to the vocdoni.org
-   organisation: OAuth consent screen Internal; OAuth client type Web;
-   redirect URI `https://oauth.vocdoni.org/callback`; save
-   `GOOGLE_CLIENT_ID=…` and `GOOGLE_CLIENT_SECRET=…` in
-   `/volumes/repos/vocdoni/oauth/google-oauth-secret.txt` (git-ignored).
-2. Railway: the Railway project for this service; project token in
-   `/volumes/repos/vocdoni/oauth/railway-api-key.txt` (git-ignored).
-3. Gandi DNS: CNAME (and TXT if asked) for `oauth.vocdoni.org` as the agent
-   provides.
+   organisation: OAuth consent screen **Internal**; OAuth client type **Web
+   application**; authorised redirect URI `https://oauth.vocdoni.org/callback`.
+2. Store the client id and secret only in the Railway variables
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (see Operations), never in
+   the repository.
+3. DNS: a CNAME for `oauth.vocdoni.org` pointing to the Railway service
+   domain, plus the TXT verification record Railway asks for.
 
 The Internal consent screen admits only organisation accounts and needs no
 Google app verification. Files matching `*-secret*.txt`, `*-token.txt` and
@@ -136,12 +135,11 @@ runs the same image (with [dev/config.yaml](dev/config.yaml)) on
 `http://localhost:5556` with a password database instead of Google: user
 `dev@vocdoni.org` with that password, client `dev` with secret
 `dev-client-secret` and redirect URI `http://localhost:8080/auth/callback`.
-Both examples default to that setup (see their headers), with
-`OAUTH_INSECURE=1` for plain-http localhost. `make dev-down` stops it.
+The header comment of each example lists the environment for that setup
+(`OAUTH_INSECURE=1` allows plain-http localhost). `make dev-down` stops it.
 
 Other targets: `make image`, `make smoke` (build and run the container smoke
-test), `make test` (both kits; needs the examples, so it works once they are
-present).
+test), `make test` (both kits and the Go example).
 
 ## Operations (Railway)
 
