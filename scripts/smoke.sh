@@ -63,7 +63,7 @@ envs=("ISSUER=$issuer" PORT=5556 DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS=true
 secrets=$(grep -oE 'secretEnv: *CLIENT_[A-Z0-9_]+_SECRET' "$config" | awk '{print $2}' | sort -u)
 [ -n "$secrets" ] || fail "no staticClients secretEnv found in the config"
 for s in $secrets; do envs+=("$s=smoke-$s"); done
-first_secret=$(echo "$secrets" | head -1)
+first_secret=${secrets%%$'\n'*}
 env_args=()
 for e in "${envs[@]}"; do env_args+=(-e "$e"); done
 
@@ -84,13 +84,14 @@ start() {
 
 # wait_healthy <container>: prints the base URL once /healthz answers.
 wait_healthy() {
-  local c=$1 base
+  local c=$1 base ports
   for _ in $(seq 1 60); do
     if [ "$(docker inspect -f '{{.State.Running}}' "$c")" != true ]; then
       docker logs "$c" >&2 || true
       fail "$c exited during start"
     fi
-    base="http://$(docker port "$c" 5556/tcp | head -1)"
+    ports=$(docker port "$c" 5556/tcp)
+    base="http://${ports%%$'\n'*}"
     if curl -fsS -o /dev/null "$base/healthz" 2>/dev/null; then
       echo "$base"
       return
@@ -101,16 +102,27 @@ wait_healthy() {
   fail "$c: /healthz never answered"
 }
 
+# container_logs <container>: writes its logs (stdout and stderr) to a file
+# under $work and prints the path. Readers that stop early (head, grep -q)
+# then read the file: piping `docker logs` into them races under pipefail
+# (docker logs gets SIGPIPE and the check fails at random).
+container_logs() {
+  local f=$work/$1.log
+  docker logs "$1" >"$f" 2>&1
+  echo "$f"
+}
+
 # expect_exit <container> <log pattern>: the container must stop non-zero.
 expect_exit() {
-  local c=$1 pattern=$2
+  local c=$1 pattern=$2 logs
   for _ in $(seq 1 40); do
     [ "$(docker inspect -f '{{.State.Running}}' "$c")" = true ] || break
     sleep 0.5
   done
   [ "$(docker inspect -f '{{.State.Running}}' "$c")" != true ] || fail "$c still running"
   [ "$(docker inspect -f '{{.State.ExitCode}}' "$c")" != 0 ] || fail "$c exited 0"
-  docker logs "$c" 2>&1 | grep -q -- "$pattern" || { docker logs "$c" >&2; fail "$c: log lacks '$pattern'"; }
+  logs=$(container_logs "$c")
+  grep -q -- "$pattern" "$logs" || { cat "$logs" >&2; fail "$c: log lacks '$pattern'"; }
 }
 
 # ---- A. Railway mode ---------------------------------------------------------
@@ -150,7 +162,8 @@ pass "Google redirect (hd=vocdoni.org, <ISSUER>/callback, no prompt)"
 
 docker exec "$a" test -s /data/dex.db || fail "/data/dex.db not created"
 pass "SQLite database on the root-owned volume"
-docker logs "$a" 2>&1 | head -5 | jq -e . >/dev/null || fail "logs are not JSON"
+a_logs=$(container_logs "$a")
+head -5 "$a_logs" | jq -e . >/dev/null || fail "logs are not JSON"
 pass "JSON logs"
 
 # ---- B. missing client secret ---------------------------------------------------
