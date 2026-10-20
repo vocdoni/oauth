@@ -75,3 +75,9 @@ staticClients:
     secretEnv: CLIENT_FOLIO_SECRET
     redirectURIs:
       - https://folio.vocdoni.net/ui/api/oidc/callback
+  # {{ if not (getenv "CLIENT_KB_SECRET") }}{{ fail "CLIENT_KB_SECRET is not set" }}{{ end }}
+  - id: "kb"
+    name: "Vocdoni KB"
+    secretEnv: CLIENT_KB_SECRET
+    redirectURIs:
+      - https://kb.vocdoni.net/api/auth/oidc/vocdoni/callback
