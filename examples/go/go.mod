@@ -2,6 +2,8 @@ module github.com/vocdoni/oauth/examples/go
 
 go 1.26.0
 
+toolchain go1.27.2
+
 require github.com/vocdoni/oauth/go v0.0.0
 
 require (
