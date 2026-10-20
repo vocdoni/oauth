@@ -134,7 +134,7 @@ pass "/healthz"
 [ "$(curl -fsS -o /dev/null -w '%{content_type}' "$base/theme/vocdoni-logo.png")" = image/png ] || fail "logo not served"
 pass "logo served from /theme"
 
-client_id=$(grep -A3 -E '^  - id: ' "$config" | awk '/^  - id: /{print $3; exit}')
+client_id=$(awk '/^  - id: /{gsub(/"/, "", $3); print $3; exit}' "$config")
 redirect=$(awk '/redirectURIs:/{getline; sub(/^ *- */, ""); print; exit}' "$config")
 q="client_id=$client_id&redirect_uri=$(jq -rn --arg u "$redirect" '$u|@uri')&response_type=code&scope=openid+email+profile&state=smoke"
 loc=$(curl -sS -o /dev/null -w '%{redirect_url}' "$base/auth/google?$q")

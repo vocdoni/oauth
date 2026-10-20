@@ -114,9 +114,15 @@ jobs:
       - name: container smoke test
         run: scripts/smoke.sh oauth:ci
       - name: add-client config loads (acceptance 5)
+        # "yes" is a YAML 1.1 boolean: the generated block must quote it so
+        # Dex reads a string; a second "demo" must be refused as a duplicate.
         run: |
           set -euo pipefail
           make add-client ID=demo URL=https://demo.example/auth/callback
+          make add-client ID=yes URL=https://yes.example/auth/callback
+          if scripts/add-client.sh demo https://demo.example/auth/callback; then
+            echo "::error::duplicate client accepted"; exit 1
+          fi
           git diff --stat config.yaml
           scripts/smoke.sh oauth:ci config.yaml
       - name: dev image builds

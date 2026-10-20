@@ -27,7 +27,7 @@ die() {
 [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9\ ._-]{0,63}$ ]] || die "NAME may hold letters, digits, spaces, . _ - (got '$name')"
 [ -f "$config" ] || die "$config not found"
 [ "$(grep -E '^[A-Za-z]' "$config" | tail -1)" = "staticClients:" ] || die "staticClients must be the last section of $config"
-grep -qE "^  - id: $id\$" "$config" && die "client '$id' already exists in $config"
+grep -qE "^  - id: \"?$id\"?\$" "$config" && die "client '$id' already exists in $config"
 
 env_name="CLIENT_$(printf '%s' "$id" | LC_ALL=C tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')_SECRET"
 grep -q "secretEnv: $env_name\$" "$config" && die "$env_name is already used in $config"
@@ -36,8 +36,8 @@ grep -q "secretEnv: $env_name\$" "$config" && die "$env_name is already used in 
 [ -z "$(tail -c1 "$config")" ] || echo >>"$config"
 cat >>"$config" <<BLOCK
   # {{ if not (getenv "$env_name") }}{{ fail "$env_name is not set" }}{{ end }}
-  - id: $id
-    name: $name
+  - id: "$id"
+    name: "$name"
     secretEnv: $env_name
     redirectURIs:
       - $url
