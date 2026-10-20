@@ -29,7 +29,7 @@ die() {
 [ "$(grep -E '^[A-Za-z]' "$config" | tail -1)" = "staticClients:" ] || die "staticClients must be the last section of $config"
 grep -qE "^  - id: $id\$" "$config" && die "client '$id' already exists in $config"
 
-env_name="CLIENT_$(printf '%s' "$id" | tr 'a-z' 'A-Z' | tr -c 'A-Z0-9' '_')_SECRET"
+env_name="CLIENT_$(printf '%s' "$id" | LC_ALL=C tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9' '_')_SECRET"
 grep -q "secretEnv: $env_name\$" "$config" && die "$env_name is already used in $config"
 
 # Ensure the file ends with a newline before appending.
