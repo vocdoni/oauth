@@ -81,3 +81,9 @@ staticClients:
     secretEnv: CLIENT_KB_SECRET
     redirectURIs:
       - https://kb.vocdoni.net/api/auth/oidc/vocdoni/callback
+  # {{ if not (getenv "CLIENT_CLAUDE_PROXY_SECRET") }}{{ fail "CLIENT_CLAUDE_PROXY_SECRET is not set" }}{{ end }}
+  - id: "claude-proxy"
+    name: "Claude proxy"
+    secretEnv: CLIENT_CLAUDE_PROXY_SECRET
+    redirectURIs:
+      - https://claude.vocdoni.net/auth/callback
