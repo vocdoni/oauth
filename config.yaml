@@ -87,3 +87,9 @@ staticClients:
     secretEnv: CLIENT_CLAUDE_PROXY_SECRET
     redirectURIs:
       - https://claude.vocdoni.net/auth/callback
+  # {{ if not (getenv "CLIENT_AUDITORE_SECRET") }}{{ fail "CLIENT_AUDITORE_SECRET is not set" }}{{ end }}
+  - id: "auditore"
+    name: "Auditore"
+    secretEnv: CLIENT_AUDITORE_SECRET
+    redirectURIs:
+      - https://auditore.vocdoni.net/auth/callback
