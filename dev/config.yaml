@@ -25,15 +25,10 @@ frontend:
   dir: /srv/dex/web
 
 expiry:
-  idTokens: 10m
+  # Same token lifetime as config.yaml.
+  idTokens: 24h
   authRequests: 10m
   deviceRequests: 5m
-  # Same refresh policy as config.yaml.
-  refreshTokens:
-    disableRotation: false
-    reuseInterval: 3s
-    validIfNotUsedFor: 24h
-    absoluteLifetime: 168h
 
 # Signing keys rotate every 6 h (expiry.signingKeys is deprecated in v2.46.0).
 signer:
@@ -42,8 +37,7 @@ signer:
     keysRotationPeriod: 6h
 
 oauth2:
-  # refresh_token takes effect only for clients that request offline_access.
-  grantTypes: [authorization_code, refresh_token]
+  grantTypes: [authorization_code]
   responseTypes: [code]
   skipApprovalScreen: true
   alwaysShowLoginScreen: false

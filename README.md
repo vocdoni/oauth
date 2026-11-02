@@ -142,14 +142,12 @@ given to `--callback-port`). A client on another port needs its URI added by
 pull request; without `redirectURIs`, Dex would also accept any loopback port
 and the out-of-band URI. PKCE (S256) is still enforced.
 
-A client gets a refresh token only when it requests the `offline_access` scope.
-Dex issued them to any such client before; now they can be redeemed too, so a
-client that asks for `offline_access` keeps access up to 7 days. The kits do not
-request it. Refresh tokens rotate on use (a 3 s reuse window absorbs retries),
-expire after 24 h unused and after 168 h (7 days) in all. MCP users see Google's
-consent screen at each interactive sign-in, because `offline_access` makes Dex
-send `access_type=offline&prompt=consent` to Google, which is required for
-Google to issue a refresh token.
+There are no refresh tokens: Dex v2.46 on SQLite deadlocks `/token` on the
+first refresh ([dexidp/dex#5017](https://github.com/dexidp/dex/issues/5017)),
+so the `refresh_token` grant stays off until a fixed release. Instead, tokens
+(`expiry.idTokens`) last 24 h, and an MCP client signs in again about once a
+day. Clients should not request `offline_access`: it adds Google's consent
+screen and gains nothing.
 
 ```sh
 claude mcp add --transport http --client-id auditore-mcp --callback-port 8765 auditore https://auditore.vocdoni.net/mcp
@@ -237,9 +235,9 @@ run them.
 - Trust boundary: tools trust only ID tokens for their own client id signed
   by the central JWKS; the central service trusts only Google for
   `hd=vocdoni.org`.
-- Policy: authorization code flow, and refresh tokens only for clients that
-  request `offline_access`; PKCE S256 enforced by Dex; no implicit, password
-  or device grants; `/token` requires the client secret, except for public
+- Policy: authorization code flow only, with 24 h tokens; PKCE S256 enforced
+  by Dex; no refresh (see MCP and CLI clients), implicit, password or device
+  grants; `/token` requires the client secret, except for public
   clients (PKCE only). Every unknown configuration key stops the container, in
   CI and in production (`DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS=true`).
 - Secrets live only in Railway variables, never in the repository, the image

@@ -12,7 +12,7 @@
 #
 # A. Railway mode: root (--user 0, as RAILWAY_RUN_UID=0) with a root-owned
 #    volume at /data: discovery issuer, grant_types_supported ==
-#    ["authorization_code","refresh_token"], response_types_supported == ["code"],
+#    ["authorization_code"], response_types_supported == ["code"],
 #    code_challenge_methods_supported == ["S256"], /keys has a key, /healthz
 #    OK, logo served, PKCE enforced (no code_challenge -> invalid_request),
 #    Google redirect carries hd=vocdoni.org and <ISSUER>/callback, SQLite
@@ -135,7 +135,7 @@ base=$(wait_healthy "$a")
 
 disc=$(curl -fsS "$base/.well-known/openid-configuration")
 jq -e --arg iss "$issuer" '.issuer == $iss' <<<"$disc" >/dev/null || fail "issuer: $(jq -c .issuer <<<"$disc")"
-jq -e '.grant_types_supported == ["authorization_code","refresh_token"]' <<<"$disc" >/dev/null || fail "grant_types_supported: $(jq -c .grant_types_supported <<<"$disc")"
+jq -e '.grant_types_supported == ["authorization_code"]' <<<"$disc" >/dev/null || fail "grant_types_supported: $(jq -c .grant_types_supported <<<"$disc")"
 jq -e '.response_types_supported == ["code"]' <<<"$disc" >/dev/null || fail "response_types_supported: $(jq -c .response_types_supported <<<"$disc")"
 jq -e '.code_challenge_methods_supported == ["S256"]' <<<"$disc" >/dev/null || fail "code_challenge_methods_supported: $(jq -c .code_challenge_methods_supported <<<"$disc")"
 pass "discovery document"
@@ -163,7 +163,7 @@ pass "Google redirect (hd=vocdoni.org, <ISSUER>/callback, no prompt)"
 
 # The public MCP client (auditore-mcp must be in the config under test): its
 # pinned loopback callback reaches Google; other redirect URIs are refused.
-mcp_q="client_id=auditore-mcp&response_type=code&scope=openid+email+profile+offline_access&state=smoke&code_challenge=$challenge&code_challenge_method=S256"
+mcp_q="client_id=auditore-mcp&response_type=code&scope=openid+email+profile&state=smoke&code_challenge=$challenge&code_challenge_method=S256"
 loc=$(curl -sS -o /dev/null -w '%{redirect_url}' "$base/auth/google?$mcp_q&redirect_uri=$(jq -rn --arg u 'http://127.0.0.1:8765/callback' '$u|@uri')")
 [[ "$loc" == https://accounts.google.com/* ]] || fail "auditore-mcp loopback callback not accepted: $loc"
 pass "auditore-mcp: pinned loopback callback reaches Google"
