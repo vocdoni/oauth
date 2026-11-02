@@ -110,6 +110,27 @@ Kit behaviour (identical in both kits):
 - If the provider is down, the tool still starts; sign-in answers
   `503 {"error":"sso_unavailable"}` and is retried with backoff.
 
+### Bearer tokens (APIs and MCP servers)
+
+Go kit only for now; the browser flow above is the same in both kits, but
+the bearer side is not in the Node kit yet. An API or MCP server that gets
+`Authorization: Bearer <access token>` from a public client (such as
+`auditore-mcp`) verifies the token with `vocauth.Bearer`: signature, issuer,
+expiry and audience, then the same admission rules as sign-in. The client must
+request the `email` scope, or its tokens carry no e-mail and are refused.
+
+```go
+b, err := vocauth.NewBearer(vocauth.BearerConfig{
+    Issuer:              "https://oauth.vocdoni.org",
+    Audiences:           []string{"auditore-mcp"},
+    ResourceMetadataURL: "https://api.vocdoni.io/.well-known/oauth-protected-resource",
+})
+mux.Handle("/.well-known/oauth-protected-resource",
+    vocauth.ProtectedResourceMetadata("https://api.vocdoni.io", "https://oauth.vocdoni.org", nil))
+mux.Handle("/api/", b.Require(api))
+user, ok := vocauth.FromContext(r.Context()) // the same User as the browser flow
+```
+
 ## MCP and CLI clients (public clients)
 
 Programs on a user's machine (MCP servers, CLIs) cannot keep a secret, so they

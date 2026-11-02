@@ -93,27 +93,8 @@ func (c Config) normalize() (Config, error) {
 	case c.MaxAge < time.Second || c.MaxAge > MaxMaxAge:
 		errs = append(errs, fmt.Errorf("vocauth: MaxAge must be between 1s and %s", MaxMaxAge))
 	}
-	domains := make([]string, 0, len(c.AllowedDomains))
-	for _, d := range c.AllowedDomains {
-		d = asciiLower(strings.TrimSpace(d))
-		if d == "" || strings.Contains(d, "@") {
-			errs = append(errs, fmt.Errorf("vocauth: invalid allowed domain %q", d))
-			continue
-		}
-		domains = append(domains, d)
-	}
-	emails := make([]string, 0, len(c.AllowedEmails))
-	for _, e := range c.AllowedEmails {
-		e = asciiLower(strings.TrimSpace(e))
-		if at := strings.LastIndexByte(e, '@'); at <= 0 || at == len(e)-1 {
-			errs = append(errs, fmt.Errorf("vocauth: invalid allowed e-mail %q", e))
-			continue
-		}
-		emails = append(emails, e)
-	}
-	if len(domains) == 0 && len(emails) == 0 {
-		domains = append(domains, DefaultAllowedDomains...)
-	}
+	domains, emails, admissionErr := normalizeAdmission(c.AllowedDomains, c.AllowedEmails)
+	errs = append(errs, admissionErr)
 	c.AllowedDomains, c.AllowedEmails = domains, emails
 	if c.HTTPClient == nil {
 		c.HTTPClient = &http.Client{Timeout: httpTimeout}
@@ -128,6 +109,34 @@ func (c Config) normalize() (Config, error) {
 		return Config{}, err
 	}
 	return c, nil
+}
+
+// normalizeAdmission lower-cases and checks the allow lists, and applies the
+// default domains when both are empty. Config and BearerConfig share it.
+func normalizeAdmission(allowedDomains, allowedEmails []string) ([]string, []string, error) {
+	var errs []error
+	domains := make([]string, 0, len(allowedDomains))
+	for _, d := range allowedDomains {
+		d = asciiLower(strings.TrimSpace(d))
+		if d == "" || strings.Contains(d, "@") {
+			errs = append(errs, fmt.Errorf("vocauth: invalid allowed domain %q", d))
+			continue
+		}
+		domains = append(domains, d)
+	}
+	emails := make([]string, 0, len(allowedEmails))
+	for _, e := range allowedEmails {
+		e = asciiLower(strings.TrimSpace(e))
+		if at := strings.LastIndexByte(e, '@'); at <= 0 || at == len(e)-1 {
+			errs = append(errs, fmt.Errorf("vocauth: invalid allowed e-mail %q", e))
+			continue
+		}
+		emails = append(emails, e)
+	}
+	if len(domains) == 0 && len(emails) == 0 {
+		domains = append(domains, DefaultAllowedDomains...)
+	}
+	return domains, emails, errors.Join(errs...)
 }
 
 func checkURL(field, raw string, insecure bool) error {
