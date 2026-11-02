@@ -37,6 +37,14 @@ expiry:
   idTokens: 10m
   authRequests: 10m
   deviceRequests: 5m
+  # Dex already issued refresh tokens to any client requesting offline_access; now they
+  # can be redeemed too, so such a client keeps access up to 7 days. The kits do not
+  # request offline_access. Rotated on use; 3s reuse window for retried requests.
+  refreshTokens:
+    disableRotation: false
+    reuseInterval: 3s
+    validIfNotUsedFor: 24h
+    absoluteLifetime: 168h
 
 # Signing keys rotate every 6 h (expiry.signingKeys is deprecated in v2.46.0).
 signer:
@@ -45,7 +53,8 @@ signer:
     keysRotationPeriod: 6h
 
 oauth2:
-  grantTypes: [authorization_code]
+  # refresh_token takes effect only for clients that request offline_access.
+  grantTypes: [authorization_code, refresh_token]
   responseTypes: [code]
   skipApprovalScreen: true
   alwaysShowLoginScreen: false
@@ -99,3 +108,12 @@ staticClients:
     secretEnv: CLIENT_LEADS_CRM_SECRET
     redirectURIs:
       - https://leads.vocdoni.net/auth/callback
+  # Public client (MCP, PKCE, no secret). Pinned to Claude Code's callback port: without
+  # redirectURIs Dex accepts any loopback port and the oob URI (paste-the-code phishing).
+  # Another port needs its own URI here, by PR.
+  - id: "auditore-mcp"
+    name: "Auditore MCP"
+    public: true
+    redirectURIs:
+      - http://localhost:8765/callback
+      - http://127.0.0.1:8765/callback

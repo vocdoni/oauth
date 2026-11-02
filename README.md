@@ -110,6 +110,30 @@ Kit behaviour (identical in both kits):
 - If the provider is down, the tool still starts; sign-in answers
   `503 {"error":"sso_unavailable"}` and is retried with backoff.
 
+## MCP and CLI clients (public clients)
+
+Programs on a user's machine (MCP servers, CLIs) cannot keep a secret, so they
+register as public clients: a `staticClients` entry with `public: true`, no
+`secretEnv`, and `redirectURIs` pinned to the callback they use, like
+`auditore-mcp` in [config.yaml](config.yaml): `http://localhost:8765/callback`
+and `http://127.0.0.1:8765/callback` (Claude Code's `/callback` path on the port
+given to `--callback-port`). A client on another port needs its URI added by
+pull request; without `redirectURIs`, Dex would also accept any loopback port
+and the out-of-band URI. PKCE (S256) is still enforced.
+
+A client gets a refresh token only when it requests the `offline_access` scope.
+Dex issued them to any such client before; now they can be redeemed too, so a
+client that asks for `offline_access` keeps access up to 7 days. The kits do not
+request it. Refresh tokens rotate on use (a 3 s reuse window absorbs retries),
+expire after 24 h unused and after 168 h (7 days) in all. MCP users see Google's
+consent screen at each interactive sign-in, because `offline_access` makes Dex
+send `access_type=offline&prompt=consent` to Google, which is required for
+Google to issue a refresh token.
+
+```sh
+claude mcp add --transport http --client-id auditore-mcp --callback-port 8765 auditore https://auditore.vocdoni.net/mcp
+```
+
 ## Google setup (once)
 
 1. Google Cloud console, in a project that belongs to the vocdoni.org
@@ -134,7 +158,8 @@ make dev PASSWORD=<choose one>
 runs the same image (with [dev/config.yaml](dev/config.yaml)) on
 `http://localhost:5556` with a password database instead of Google: user
 `dev@vocdoni.org` with that password, client `dev` with secret
-`dev-client-secret` and redirect URI `http://localhost:8080/auth/callback`.
+`dev-client-secret` and redirect URI `http://localhost:8080/auth/callback`,
+and public client `dev-mcp` for the MCP flow (callback on port 8765, as above).
 The header comment of each example lists the environment for that setup
 (`OAUTH_INSECURE=1` allows plain-http localhost). `make dev-down` stops it.
 
@@ -155,6 +180,8 @@ test natively on amd64 and arm64), served at `https://oauth.vocdoni.org`.
 | `CLIENT_<ID>_SECRET` | one per client, e.g. `CLIENT_FOLIO_SECRET` |
 | `RAILWAY_RUN_UID` | `0` |
 | `DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS` | `true` |
+
+A public client (see MCP and CLI clients) has no secret and needs no variable.
 
 - Volume: 1 GB mounted at `/data` (SQLite `/data/dex.db`: signing keys and
   in-flight auth requests). Railway mounts volumes root-owned and the Dex
@@ -189,9 +216,10 @@ run them.
 - Trust boundary: tools trust only ID tokens for their own client id signed
   by the central JWKS; the central service trusts only Google for
   `hd=vocdoni.org`.
-- Policy: authorization code flow only, PKCE S256 enforced by Dex, no
-  implicit, password, device or refresh grants requested; `/token` requires
-  the client secret. Every unknown configuration key stops the container, in
+- Policy: authorization code flow, and refresh tokens only for clients that
+  request `offline_access`; PKCE S256 enforced by Dex; no implicit, password
+  or device grants; `/token` requires the client secret, except for public
+  clients (PKCE only). Every unknown configuration key stops the container, in
   CI and in production (`DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS=true`).
 - Secrets live only in Railway variables, never in the repository, the image
   or logs. The kits log refusal reasons and provider error strings server
