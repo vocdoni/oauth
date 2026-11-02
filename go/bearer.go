@@ -388,7 +388,7 @@ func (k *remoteKeys) fetch(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }() // read-only body: a close error changes nothing
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("JWKS answered %s", resp.Status)
 	}

@@ -207,7 +207,7 @@ func TestBearerRejectsAlgorithmConfusion(t *testing.T) {
 	h := newBearerHarness(t, nil)
 	claims := h.op.accessClaims(nil)
 	none := rawJWT(t, `{"alg":"none","typ":"JWT"}`, claims, nil)
-	mac := hmac.New(sha256.New, h.op.key.PublicKey.N.Bytes())
+	mac := hmac.New(sha256.New, h.op.key.N.Bytes())
 	signingInput := rawJWT(t, `{"alg":"HS256","kid":"k1","typ":"JWT"}`, claims, nil)
 	signingInput = signingInput[:strings.LastIndexByte(signingInput, '.')]
 	mac.Write([]byte(signingInput))
