@@ -93,3 +93,9 @@ staticClients:
     secretEnv: CLIENT_AUDITORE_SECRET
     redirectURIs:
       - https://auditore.vocdoni.net/auth/callback
+  # {{ if not (getenv "CLIENT_LEADS_CRM_SECRET") }}{{ fail "CLIENT_LEADS_CRM_SECRET is not set" }}{{ end }}
+  - id: "leads-crm"
+    name: "Leads CRM"
+    secretEnv: CLIENT_LEADS_CRM_SECRET
+    redirectURIs:
+      - https://leads.vocdoni.net/auth/callback
