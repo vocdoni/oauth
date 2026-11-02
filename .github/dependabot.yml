@@ -18,6 +18,10 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    # @types/node tracks the runtime major in .nvmrc; bump both together.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "build(deps)"
 
