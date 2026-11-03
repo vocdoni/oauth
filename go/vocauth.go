@@ -22,7 +22,6 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html"
 	"net/http"
@@ -50,24 +49,16 @@ func FromContext(ctx context.Context) (User, bool) {
 	return u, ok
 }
 
-const (
-	minBackoff = time.Second
-	maxBackoff = time.Minute
-)
-
-var errBackoff = errors.New("vocauth: discovery is backing off after a failure")
-
 // Auth implements the sign-in routes and the Require middleware.
 type Auth struct {
 	cfg    Config
 	keys   *keyring
 	origin string // scheme://host of RedirectURL, as a browser writes Origin
+	disc   *discovery
 
 	mu       sync.Mutex // guards the fields below
 	oauth    *oauth2.Config
 	verifier *oidc.IDTokenVerifier
-	nextTry  time.Time
-	backoff  time.Duration
 }
 
 // New validates cfg. It performs no network I/O: provider metadata and keys
@@ -85,7 +76,8 @@ func New(cfg Config) (*Auth, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Auth{cfg: c, keys: keys, origin: originOf(u)}, nil
+	disc := &discovery{issuer: c.Issuer, client: c.HTTPClient, now: c.Now}
+	return &Auth{cfg: c, keys: keys, origin: originOf(u), disc: disc}, nil
 }
 
 // originOf is scheme://host lower-cased and without a default port, the form
@@ -110,30 +102,15 @@ func (a *Auth) sameOrigin(r *http.Request) bool {
 }
 
 // discover returns the OAuth2 config and ID token verifier, fetching provider
-// metadata on first use. A failure is retried on a later call after an
-// exponential backoff (1 s doubling to 1 min); while backing off it fails fast.
+// metadata on first use (see discovery for the retry policy).
 func (a *Auth) discover() (*oauth2.Config, *oidc.IDTokenVerifier, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.oauth != nil {
 		return a.oauth, a.verifier, nil
 	}
-	now := a.cfg.Now()
-	if now.Before(a.nextTry) {
-		return nil, nil, errBackoff
-	}
-	// go-oidc keeps this context as the configuration of the provider's
-	// long-lived remote key set (JWKS refetched on unknown kid), so it must
-	// not be a request context; the HTTP client carries the timeout.
-	ctx := oidc.ClientContext(context.Background(), a.cfg.HTTPClient)
-	p, err := oidc.NewProvider(ctx, a.cfg.Issuer)
+	p, err := a.disc.provider()
 	if err != nil {
-		if a.backoff == 0 {
-			a.backoff = minBackoff
-		} else {
-			a.backoff = min(2*a.backoff, maxBackoff)
-		}
-		a.nextTry = now.Add(a.backoff)
 		return nil, nil, err
 	}
 	ep := p.Endpoint()

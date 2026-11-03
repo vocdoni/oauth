@@ -110,6 +110,49 @@ Kit behaviour (identical in both kits):
 - If the provider is down, the tool still starts; sign-in answers
   `503 {"error":"sso_unavailable"}` and is retried with backoff.
 
+### Bearer tokens (APIs and MCP servers)
+
+Go kit only for now; the browser flow above is the same in both kits, but
+the bearer side is not in the Node kit yet. An API or MCP server that gets
+`Authorization: Bearer <access token>` from a public client (such as
+`auditore-mcp`) verifies the token with `vocauth.Bearer`: signature, issuer,
+expiry and audience, then the same admission rules as sign-in. The client must
+request the `email` scope, or its tokens carry no e-mail and are refused.
+
+```go
+b, err := vocauth.NewBearer(vocauth.BearerConfig{
+    Issuer:              "https://oauth.vocdoni.org",
+    Audiences:           []string{"auditore-mcp"},
+    ResourceMetadataURL: "https://api.vocdoni.io/.well-known/oauth-protected-resource",
+})
+mux.Handle("/.well-known/oauth-protected-resource",
+    vocauth.ProtectedResourceMetadata("https://api.vocdoni.io", "https://oauth.vocdoni.org", nil))
+mux.Handle("/api/", b.Require(api))
+user, ok := vocauth.FromContext(r.Context()) // the same User as the browser flow
+```
+
+## MCP and CLI clients (public clients)
+
+Programs on a user's machine (MCP servers, CLIs) cannot keep a secret, so they
+register as public clients: a `staticClients` entry with `public: true`, no
+`secretEnv`, and `redirectURIs` pinned to the callback they use, like
+`auditore-mcp` in [config.yaml](config.yaml): `http://localhost:8765/callback`
+and `http://127.0.0.1:8765/callback` (Claude Code's `/callback` path on the port
+given to `--callback-port`). A client on another port needs its URI added by
+pull request; without `redirectURIs`, Dex would also accept any loopback port
+and the out-of-band URI. PKCE (S256) is still enforced.
+
+There are no refresh tokens: Dex v2.46 on SQLite deadlocks `/token` on the
+first refresh ([dexidp/dex#5017](https://github.com/dexidp/dex/issues/5017)),
+so the `refresh_token` grant stays off until a fixed release. Instead, tokens
+(`expiry.idTokens`) last 24 h, and an MCP client signs in again about once a
+day. Clients should not request `offline_access`: it adds Google's consent
+screen and gains nothing.
+
+```sh
+claude mcp add --transport http --client-id auditore-mcp --callback-port 8765 auditore https://auditore.vocdoni.net/mcp
+```
+
 ## Google setup (once)
 
 1. Google Cloud console, in a project that belongs to the vocdoni.org
@@ -134,7 +177,8 @@ make dev PASSWORD=<choose one>
 runs the same image (with [dev/config.yaml](dev/config.yaml)) on
 `http://localhost:5556` with a password database instead of Google: user
 `dev@vocdoni.org` with that password, client `dev` with secret
-`dev-client-secret` and redirect URI `http://localhost:8080/auth/callback`.
+`dev-client-secret` and redirect URI `http://localhost:8080/auth/callback`,
+and public client `dev-mcp` for the MCP flow (callback on port 8765, as above).
 The header comment of each example lists the environment for that setup
 (`OAUTH_INSECURE=1` allows plain-http localhost). `make dev-down` stops it.
 
@@ -155,6 +199,8 @@ test natively on amd64 and arm64), served at `https://oauth.vocdoni.org`.
 | `CLIENT_<ID>_SECRET` | one per client, e.g. `CLIENT_FOLIO_SECRET` |
 | `RAILWAY_RUN_UID` | `0` |
 | `DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS` | `true` |
+
+A public client (see MCP and CLI clients) has no secret and needs no variable.
 
 - Volume: 1 GB mounted at `/data` (SQLite `/data/dex.db`: signing keys and
   in-flight auth requests). Railway mounts volumes root-owned and the Dex
@@ -189,9 +235,10 @@ run them.
 - Trust boundary: tools trust only ID tokens for their own client id signed
   by the central JWKS; the central service trusts only Google for
   `hd=vocdoni.org`.
-- Policy: authorization code flow only, PKCE S256 enforced by Dex, no
-  implicit, password, device or refresh grants requested; `/token` requires
-  the client secret. Every unknown configuration key stops the container, in
+- Policy: authorization code flow only, with 24 h tokens; PKCE S256 enforced
+  by Dex; no refresh (see MCP and CLI clients), implicit, password or device
+  grants; `/token` requires the client secret, except for public
+  clients (PKCE only). Every unknown configuration key stops the container, in
   CI and in production (`DEX_CONFIG_DISALLOW_UNKNOWN_FIELDS=true`).
 - Secrets live only in Railway variables, never in the repository, the image
   or logs. The kits log refusal reasons and provider error strings server

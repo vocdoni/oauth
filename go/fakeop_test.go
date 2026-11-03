@@ -29,8 +29,11 @@ type fakeOP struct {
 
 	mu          sync.Mutex
 	down        bool
+	keysDown    bool                   // JWKS answers 503
+	keyHits     int                    // JWKS requests served
 	tokenStatus int                    // non-zero: token endpoint answers this status
 	noIDToken   bool                   // token response without id_token
+	kid         string                 // kid of the signing key, in the JWKS
 	rogue       bool                   // sign with a key that is not in the JWKS (same kid)
 	mutate      func(c map[string]any) // rewrites ID token claims
 	codes       map[string]issued
@@ -46,7 +49,7 @@ func newFakeOP(t *testing.T) *fakeOP {
 	if err != nil {
 		t.Fatal(err)
 	}
-	op := &fakeOP{t: t, key: key, clientID: "mytool", secret: "s3cret", codes: map[string]issued{}}
+	op := &fakeOP{t: t, key: key, kid: "k1", clientID: "mytool", secret: "s3cret", codes: map[string]issued{}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", op.discovery)
 	mux.HandleFunc("/keys", op.keys)
@@ -86,10 +89,33 @@ func (op *fakeOP) discovery(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (op *fakeOP) setKeysDown(down bool) {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	op.keysDown = down
+}
+
+// jwksHits returns how many JWKS requests the provider has served.
+func (op *fakeOP) jwksHits() int {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	return op.keyHits
+}
+
 func (op *fakeOP) keys(w http.ResponseWriter, _ *http.Request) {
-	pub := op.key.PublicKey
+	op.mu.Lock()
+	keysDown := op.keysDown
+	op.keyHits++
+	op.mu.Unlock()
+	if keysDown {
+		http.Error(w, "down", http.StatusServiceUnavailable)
+		return
+	}
+	op.mu.Lock()
+	pub, kid := op.key.PublicKey, op.kid
+	op.mu.Unlock()
 	writeJSONValue(w, map[string]any{"keys": []map[string]any{{
-		"kty": "RSA", "alg": "RS256", "use": "sig", "kid": "k1",
+		"kty": "RSA", "alg": "RS256", "use": "sig", "kid": kid,
 		"n": base64.RawURLEncoding.EncodeToString(pub.N.Bytes()),
 		"e": base64.RawURLEncoding.EncodeToString(big.NewInt(int64(pub.E)).Bytes()),
 	}}})
@@ -154,8 +180,25 @@ func (op *fakeOP) token(w http.ResponseWriter, r *http.Request) {
 	writeJSONValue(w, resp)
 }
 
+// rotate replaces the signing key and kid, as a provider does when it rotates;
+// the JWKS serves only the new key from then on.
+func (op *fakeOP) rotate(kid string) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		op.t.Fatal(err)
+	}
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	op.key, op.kid = key, kid
+}
+
 func (op *fakeOP) sign(claims map[string]any) string {
-	header, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": "k1", "typ": "JWT"})
+	return op.signKID(claims, op.kid)
+}
+
+// signKID signs claims as RS256 with the given kid.
+func (op *fakeOP) signKID(claims map[string]any, kid string) string {
+	header, _ := json.Marshal(map[string]string{"alg": "RS256", "kid": kid, "typ": "JWT"})
 	body, _ := json.Marshal(claims)
 	input := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(body)
 	sum := sha256.Sum256([]byte(input))
@@ -171,6 +214,27 @@ func (op *fakeOP) sign(claims map[string]any) string {
 		op.t.Fatal(err)
 	}
 	return input + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// accessClaims returns the claims of a provider access token for client
+// op.clientID, valid for ten minutes; mutate rewrites them.
+func (op *fakeOP) accessClaims(mutate func(c map[string]any)) map[string]any {
+	now := time.Now()
+	claims := map[string]any{
+		"iss": op.issuer(), "sub": "CiQxMjM0", "aud": op.clientID,
+		"exp": now.Add(10 * time.Minute).Unix(), "iat": now.Unix(),
+		"email": "alice@vocdoni.org", "email_verified": true, "name": "Alice Example",
+	}
+	if mutate != nil {
+		mutate(claims)
+	}
+	return claims
+}
+
+// accessToken mints a provider access token (an RS256 JWT) as the token
+// endpoint would; mutate rewrites the claims.
+func (op *fakeOP) accessToken(mutate func(c map[string]any)) string {
+	return op.sign(op.accessClaims(mutate))
 }
 
 func tokenError(w http.ResponseWriter, status int) {

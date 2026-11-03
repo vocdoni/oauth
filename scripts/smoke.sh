@@ -16,7 +16,8 @@
 #    code_challenge_methods_supported == ["S256"], /keys has a key, /healthz
 #    OK, logo served, PKCE enforced (no code_challenge -> invalid_request),
 #    Google redirect carries hd=vocdoni.org and <ISSUER>/callback, SQLite
-#    file created, logs are JSON.
+#    file created, logs are JSON, auditore-mcp pinned loopback callback
+#    accepted and other redirect URIs (https, oob) refused with 400.
 # B. A missing CLIENT_*_SECRET stops the container (gomplate presence check).
 # C. A misspelt key stops the container (unknown fields disallowed).
 # D. Default user (uid 1001) with a fresh named volume starts (local docker).
@@ -159,6 +160,18 @@ loc=$(curl -sS -o /dev/null -w '%{redirect_url}' "$base/auth/google?$q&code_chal
 [[ "$loc" == *"redirect_uri=$(jq -rn --arg u "$issuer/callback" '$u|@uri')"* ]] || fail "Google redirect_uri: $loc"
 [[ "$loc" != *"prompt="* ]] || fail "Google redirect sends a prompt parameter: $loc"
 pass "Google redirect (hd=vocdoni.org, <ISSUER>/callback, no prompt)"
+
+# The public MCP client (auditore-mcp must be in the config under test): its
+# pinned loopback callback reaches Google; other redirect URIs are refused.
+mcp_q="client_id=auditore-mcp&response_type=code&scope=openid+email+profile&state=smoke&code_challenge=$challenge&code_challenge_method=S256"
+loc=$(curl -sS -o /dev/null -w '%{redirect_url}' "$base/auth/google?$mcp_q&redirect_uri=$(jq -rn --arg u 'http://127.0.0.1:8765/callback' '$u|@uri')")
+[[ "$loc" == https://accounts.google.com/* ]] || fail "auditore-mcp loopback callback not accepted: $loc"
+pass "auditore-mcp: pinned loopback callback reaches Google"
+for ru in https://evil.example/callback urn:ietf:wg:oauth:2.0:oob; do
+  code=$(curl -sS -o /dev/null -w '%{http_code}' "$base/auth/google?$mcp_q&redirect_uri=$(jq -rn --arg u "$ru" '$u|@uri')")
+  [ "$code" = 400 ] || fail "auditore-mcp accepted redirect_uri $ru (HTTP $code)"
+done
+pass "auditore-mcp: non-loopback https and oob redirect_uri refused (400)"
 
 docker exec "$a" test -s /data/dex.db || fail "/data/dex.db not created"
 pass "SQLite database on the root-owned volume"

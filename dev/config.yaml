@@ -25,7 +25,8 @@ frontend:
   dir: /srv/dex/web
 
 expiry:
-  idTokens: 10m
+  # Same token lifetime as config.yaml.
+  idTokens: 24h
   authRequests: 10m
   deviceRequests: 5m
 
@@ -60,3 +61,10 @@ staticClients:
     secretEnv: CLIENT_DEV_SECRET
     redirectURIs:
       - http://localhost:8080/auth/callback
+  # Public client for trying the MCP flow locally; same pinned callback as auditore-mcp.
+  - id: dev-mcp
+    name: Local MCP development
+    public: true
+    redirectURIs:
+      - http://localhost:8765/callback
+      - http://127.0.0.1:8765/callback

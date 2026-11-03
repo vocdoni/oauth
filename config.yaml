@@ -34,7 +34,9 @@ frontend:
   dir: /srv/dex/web
 
 expiry:
-  idTokens: 10m
+  # 24h so MCP clients (public, no refresh) sign in about once a day. Refresh stays
+  # off: Dex v2.46 on SQLite deadlocks /token on a refresh (dexidp/dex#5017).
+  idTokens: 24h
   authRequests: 10m
   deviceRequests: 5m
 
@@ -99,3 +101,12 @@ staticClients:
     secretEnv: CLIENT_LEADS_CRM_SECRET
     redirectURIs:
       - https://leads.vocdoni.net/auth/callback
+  # Public client (MCP, PKCE, no secret). Pinned to Claude Code's callback port: without
+  # redirectURIs Dex accepts any loopback port and the oob URI (paste-the-code phishing).
+  # Another port needs its own URI here, by PR.
+  - id: "auditore-mcp"
+    name: "Auditore MCP"
+    public: true
+    redirectURIs:
+      - http://localhost:8765/callback
+      - http://127.0.0.1:8765/callback
