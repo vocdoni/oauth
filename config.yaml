@@ -99,3 +99,9 @@ staticClients:
     secretEnv: CLIENT_LEADS_CRM_SECRET
     redirectURIs:
       - https://leads.vocdoni.net/auth/callback
+  # {{ if not (getenv "CLIENT_SAAS_DASHBOARD_SECRET") }}{{ fail "CLIENT_SAAS_DASHBOARD_SECRET is not set" }}{{ end }}
+  - id: "saas-dashboard"
+    name: "SaaS Dashboard"
+    secretEnv: CLIENT_SAAS_DASHBOARD_SECRET
+    redirectURIs:
+      - https://saas-dashboard.vocdoni.dev/auth/callback
