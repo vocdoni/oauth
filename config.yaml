@@ -105,3 +105,10 @@ staticClients:
     secretEnv: CLIENT_SAAS_DASHBOARD_SECRET
     redirectURIs:
       - https://saas-dashboard.vocdoni.dev/auth/callback
+  # {{ if not (getenv "CLIENT_MONITOR_SECRET") }}{{ fail "CLIENT_MONITOR_SECRET is not set" }}{{ end }}
+  - id: "monitor"
+    name: "Monitor"
+    secretEnv: CLIENT_MONITOR_SECRET
+    redirectURIs:
+      - https://grafana-production-c997.up.railway.app/login/generic_oauth
+      - https://monitor.vocdoni.net/login/generic_oauth
