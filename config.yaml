@@ -112,3 +112,9 @@ staticClients:
     redirectURIs:
       - https://grafana-production-c997.up.railway.app/login/generic_oauth
       - https://monitor.vocdoni.net/login/generic_oauth
+  # {{ if not (getenv "CLIENT_VOCDONI_CRM_SECRET") }}{{ fail "CLIENT_VOCDONI_CRM_SECRET is not set" }}{{ end }}
+  - id: "vocdoni-crm"
+    name: "Vocdoni CRM"
+    secretEnv: CLIENT_VOCDONI_CRM_SECRET
+    redirectURIs:
+      - https://crm.vocdoni.net/auth/callback
