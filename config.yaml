@@ -118,3 +118,9 @@ staticClients:
     secretEnv: CLIENT_VOCDONI_CRM_SECRET
     redirectURIs:
       - https://crm.vocdoni.net/auth/callback
+  # {{ if not (getenv "CLIENT_IPC_TESTING_SECRET") }}{{ fail "CLIENT_IPC_TESTING_SECRET is not set" }}{{ end }}
+  - id: "ipc-testing"
+    name: "IPC testing"
+    secretEnv: CLIENT_IPC_TESTING_SECRET
+    redirectURIs:
+      - https://testers.ipc.vocdoni.dev/auth/callback
